@@ -1,0 +1,9 @@
+*.pyc
+*.egg-info/
+
+/.coverage
+/.tox/
+/build/
+/dist/
+/pip-wheel-metadata/
+/src/cloud_tasks_deferred/__version__.py

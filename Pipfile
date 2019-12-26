@@ -1,0 +1,15 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+
+[dev-packages]
+setuptools-scm = "*"
+pre-commit = "*"
+twine = "*"
+cloud-tasks-deferred = {editable = true,path = "."}
+
+[requires]
+python_version = "3.7"
