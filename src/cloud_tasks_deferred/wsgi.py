@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def application(environ, start_response):
+    """A WSGI application that processes deferred invocations."""
+
     def abort(status):
         start_response(status, [('Content-Type', 'text/plain')])
         return []
