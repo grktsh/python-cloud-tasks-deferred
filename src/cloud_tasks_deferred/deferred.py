@@ -109,6 +109,20 @@ def run(data):
         return func(*args, **kwargs)
 
 
+def _invoke_member(obj, membername, *args, **kwargs):
+    """Retrieve a member of an object, then call it with the provided arguments.
+
+    Args:
+        obj: The object to operate on.
+        membername: The name of the member to retrieve from ojb.
+        args: Positional arguments to pass to the method.
+        kwargs: Keyword arguments to pass to the method.
+    Returns:
+        The return value of the method invocation.
+    """
+    return getattr(obj, membername)(*args, **kwargs)
+
+
 def _curry_callable(obj, *args, **kwargs):
     """Take a callable and arguments and return a task queue tuple.
 
@@ -125,9 +139,29 @@ def _curry_callable(obj, *args, **kwargs):
     Raises:
         ValueError: If the passed in object is not of a valid callable type.
     """
-    if isinstance(obj, (types.FunctionType, types.BuiltinFunctionType)):
+    if isinstance(obj, types.MethodType):
+        return (
+            _invoke_member,
+            (obj.__self__, obj.__func__.__name__) + args,
+            kwargs,
+        )
+    if isinstance(obj, (types.BuiltinFunctionType, types.BuiltinMethodType)):
+        # https://stackoverflow.com/a/42909466
+        is_builtin_function = (
+            isinstance(obj.__self__, types.ModuleType)  # Python 3
+            or obj.__self__ is None  # Python 2
+        )
+        if is_builtin_function:
+            return obj, args, kwargs
+        else:
+            return (
+                _invoke_member,
+                (obj.__self__, obj.__name__) + args,
+                kwargs,
+            )
+    if isinstance(obj, object) and hasattr(obj, '__call__'):
         return obj, args, kwargs
-    raise NotImplementedError
+    raise ValueError('obj must be callable')
 
 
 def _serialize(obj, *args, **kwargs):

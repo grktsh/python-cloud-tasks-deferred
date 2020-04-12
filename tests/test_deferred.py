@@ -16,11 +16,6 @@ LOCATION = 'my-location'
 QUEUE = 'my-queue'
 
 
-class Curried(object):
-    def instance_method(self):
-        pass
-
-
 def function(x, y=42):
     pass
 
@@ -57,9 +52,103 @@ def mock__gae_version(mocker):
     )
 
 
-def test__curry_callable_not_implemented_error():
-    with pytest.raises(NotImplementedError):
-        deferred._curry_callable(Curried().instance_method)
+# 1) Functions defined in the top level of a module
+def top_level_function(a, b):
+    return a + b
+
+
+# 2) Classes defined in the top level of a module
+class TopLevelClass:
+    def __init__(self, a=0, b=0):
+        self.c = a + b
+
+    # 4) Instance methods of objects of classes in (2)
+    def instance_method(self, a, b):
+        return a + b
+
+    # 3) Instances of classes in (2) that implement __call__
+    __call__ = instance_method
+
+    # 5) Class methods of classes in (2)
+    @classmethod
+    def class_method(cls, a, b):
+        return a + b
+
+
+def test__curry_callable_1_top_level_function():
+    curried = deferred._curry_callable(top_level_function, 2, b=3)
+    assert curried == (top_level_function, (2,), dict(b=3))
+
+    result = deferred.run(pickle.dumps(curried))
+    assert result == 5
+
+
+def test__curry_callable_2_top_level_class():
+    curried = deferred._curry_callable(TopLevelClass, 2, b=3)
+    assert curried == (TopLevelClass, (2,), dict(b=3))
+
+    result = deferred.run(pickle.dumps(curried))
+    assert isinstance(result, TopLevelClass)
+    assert result.c == 5
+
+
+def test__curry_callable_3___call__():
+    obj = TopLevelClass()
+    curried = deferred._curry_callable(obj, 2, b=3)
+    assert curried == (obj, (2,), dict(b=3))
+
+    result = deferred.run(pickle.dumps(curried))
+    assert result == 5
+
+
+def test__curry_callable_4_instance_method():
+    obj = TopLevelClass()
+    curried = deferred._curry_callable(obj.instance_method, 2, b=3)
+    assert curried == (
+        deferred._invoke_member,
+        (obj, 'instance_method', 2),
+        dict(b=3),
+    )
+
+    result = deferred.run(pickle.dumps(curried))
+    assert result == 5
+
+
+def test__curry_callable_5_class_method():
+    curried = deferred._curry_callable(TopLevelClass.class_method, 2, b=3)
+    assert curried == (
+        deferred._invoke_member,
+        (TopLevelClass, 'class_method', 2,),
+        dict(b=3),
+    )
+
+    result = deferred.run(pickle.dumps(curried))
+    assert result == 5
+
+
+def test__curry_callable_6_builtin_function():
+    curried = deferred._curry_callable(len, [2, 3, 5])
+    assert curried == (len, ([2, 3, 5],), {})
+
+    result = deferred.run(pickle.dumps(curried))
+    assert result == 3
+
+
+def test__curry_callable_7_builtin_method():
+    obj = []
+    curried = deferred._curry_callable(obj.append, 42)
+    assert curried == (deferred._invoke_member, (obj, 'append', 42), {})
+
+    data = pickle.dumps(curried)
+    func, args, kwargs = pickle.loads(data)
+    func(*args, **kwargs)
+    assert args[0] == [42]
+    assert obj == []
+
+
+def test__curry_callable_not_callable():
+    with pytest.raises(ValueError, match='obj must be callable'):
+        deferred._curry_callable('not callable')
 
 
 @pytest.mark.parametrize(
