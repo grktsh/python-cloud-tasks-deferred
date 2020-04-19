@@ -20,8 +20,8 @@ Prerequisites
 
 - Environment variable ``QUEUE_LOCATION`` in which Cloud Tasks service runs
 
-Unavaiable options
-------------------
+Unavailable options
+-------------------
 
 - ``_transactional``: Transactional tasks are unavailable in Cloud Tasks
 - ``_retry_options``: Retry options for tasks are unavailable in Cloud Tasks
