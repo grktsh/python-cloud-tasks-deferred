@@ -43,6 +43,9 @@ def application(environ, start_response):
 
     try:
         deferred.run(data)
+    except deferred.SingularTaskFailure:
+        logger.debug('Failure executing task, task retry forced')
+        return abort('408 Request Timeout')
     except deferred.PermanentTaskFailure:
         logger.exception('Permanent failure attempting to execute task')
     except Exception:

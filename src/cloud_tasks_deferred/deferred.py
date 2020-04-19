@@ -94,6 +94,10 @@ class PermanentTaskFailure(Error):
     """Indicates that a task failed, and will never succeed."""
 
 
+class SingularTaskFailure(Error):
+    """Indicates that a task failed once."""
+
+
 class InvalidTaskError(Error):
     """The parameters, headers, or method of the task is invalid."""
 

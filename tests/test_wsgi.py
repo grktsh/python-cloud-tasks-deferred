@@ -10,6 +10,7 @@ import falcon
 import pytest
 from falcon import testing
 
+from cloud_tasks_deferred import deferred
 from cloud_tasks_deferred import wsgi
 
 
@@ -50,6 +51,16 @@ def test_application(simulate_post):
     body = pickle.dumps((bool, (), {}))
     response = simulate_post(body=body)
     assert response.status == falcon.HTTP_NO_CONTENT
+
+
+def test_application_singular_task_failure(simulate_post, mocker):
+    mocker.patch(
+        'cloud_tasks_deferred.deferred.run',
+        side_effect=deferred.SingularTaskFailure,
+    )
+    body = pickle.dumps((bool, (), {}))
+    response = simulate_post(body=body)
+    assert response.status == '408 Request Timeout'
 
 
 def test_application_permanent_task_failure(simulate_post):
