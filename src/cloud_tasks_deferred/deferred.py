@@ -74,13 +74,14 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import datetime
 import os
 import pickle
 import types
 
 from google.cloud import tasks_v2
+from google.protobuf import timestamp_pb2
 
-_TASKQUEUE_HEADERS = {'Content-Type': 'application/octet-stream'}
 _DEFAULT_URL = '/api/tasks/deferred'
 _DEFAULT_QUEUE = 'default'
 
@@ -91,6 +92,10 @@ class Error(Exception):
 
 class PermanentTaskFailure(Error):
     """Indicates that a task failed, and will never succeed."""
+
+
+class InvalidTaskError(Error):
+    """The parameters, headers, or method of the task is invalid."""
 
 
 def run(data):
@@ -190,67 +195,111 @@ def defer(obj, *args, **kwargs):
     Args:
         obj: The callable to execute. See module docstring for restrictions.
             _countdown, _eta, _headers, _name, _target, _url,
-            _retry_options, _queue: Passed through to the task queue - see the
+            _queue: Passed through to the task queue - see the
             task queue documentation for details.
         args: Positional arguments to call the callable with.
         kwargs: Any other keyword arguments are passed through to the callable.
     Returns:
         A deferred._Task object which represents an enqueued callable.
     """
-    if '_transactional' in kwargs:
-        raise NotImplementedError("'_transactional' is not supported.")
-
-    for x in (
-        '_countdown',
-        '_eta',
-        '_name',
-        '_target',
-        '_retry_options',
-    ):
-        if x in kwargs:
-            raise NotImplementedError('{!r} is not supported yet.'.format(x))
-
-    url = kwargs.pop('_url', _DEFAULT_URL)
-    headers = dict(_TASKQUEUE_HEADERS)
-    headers.update(kwargs.pop('_headers', {}))
+    task_kwargs_defaults = {
+        'countdown': None,
+        'eta': None,
+        'headers': None,
+        'name': None,
+        'target': None,
+        'url': _DEFAULT_URL,
+    }
+    task_kwargs = {
+        k: kwargs.pop('_' + k, v) for k, v in task_kwargs_defaults.items()
+    }
     queue = kwargs.pop('_queue', _DEFAULT_QUEUE)
 
     pickled = _serialize(obj, *args, **kwargs)
-    task = _Task(body=pickled, relative_uri=url, headers=headers)
-    return _create_task(task, queue)
-
-
-def _create_task(task, queue):
-    client = tasks_v2.CloudTasksClient()
-    parent = client.queue_path(
-        _google_cloud_project(), _queue_location(), queue
-    )
-    return client.create_task(parent, task.to_dict())
+    task = _Task(pickled, **task_kwargs)
+    return task.add(queue)
 
 
 class _Task(object):
-    def __init__(self, body=None, relative_uri=None, headers=None):
-        self._body = body
-        self._relative_uri = relative_uri or _DEFAULT_URL
-        self._headers = headers or _TASKQUEUE_HEADERS
+    def __init__(
+        self,
+        payload=None,
+        countdown=None,
+        eta=None,
+        headers=None,
+        name=None,
+        target=None,
+        url=None,
+    ):
+        self.payload = payload
+        self._task_id = name
+        self._app_engine_routing = _get_app_engine_routing(target)
+        self._relative_uri = url or _DEFAULT_URL
+        self._headers = headers
+        self._schedule_time = _get_schedule_time(countdown, eta)
 
-    def to_dict(self):
-        return {
+    def add(self, queue_name=_DEFAULT_QUEUE):
+        client = tasks_v2.CloudTasksClient()
+        parent = client.queue_path(
+            _get_project_id(), _get_location_id(), queue_name
+        )
+        task_dict = self._create_task_dict(parent)
+        return client.create_task(parent, task_dict)
+
+    def _create_task_dict(self, parent):
+        result = {
             'app_engine_http_request': {
                 'http_method': 'POST',
-                'app_engine_routing': {'version': _gae_version()},
+                'app_engine_routing': self._app_engine_routing,
                 'relative_uri': self._relative_uri,
                 'headers': self._headers,
-                'body': self._body,
-            }
+                'body': self.payload,
+            },
         }
+        if self._schedule_time is not None:
+            result['schedule_time'] = _to_timestamp(self._schedule_time)
+        if self._task_id is not None:
+            result['name'] = '{parent}/tasks/{task_id}'.format(
+                parent=parent, task_id=self._task_id
+            )
+        return result
 
-    @property
-    def payload(self):
-        return self._body
+
+def _get_app_engine_routing(target=None):
+    if target is None:
+        target = _get_default_target()
+
+    return dict(
+        zip(('service', 'version', 'instance'), reversed(target.split('.')))
+    )
 
 
-def _google_cloud_project():
+def _get_default_target():
+    gae_service = _get_gae_service()
+    gae_version = _get_gae_version()
+    if gae_version is None:
+        return gae_service
+    else:
+        return gae_version + '.' + gae_service
+
+
+def _get_schedule_time(countdown=None, eta=None, now=datetime.datetime.utcnow):
+    if countdown is not None and eta is not None:
+        raise InvalidTaskError('Cannot use a countdown and ETA together')
+
+    if countdown is None:
+        return eta
+    else:
+        return now() + datetime.timedelta(seconds=countdown)
+
+
+def _to_timestamp(dt):
+    timestamp = timestamp_pb2.Timestamp()
+    timestamp.FromDatetime(dt)
+    return timestamp
+
+
+def _get_project_id():
     try:
         return os.environ['GOOGLE_CLOUD_PROJECT']
     except KeyError:  # pragma: no cover
@@ -259,18 +308,23 @@ def _google_cloud_project():
         return app_identity.get_application_id()
 
 
-def _queue_location():
+def _get_gae_service():
     try:
-        return os.environ['QUEUE_LOCATION']
-    except KeyError:
-        # TODO: Use admin API
-        return 'asia-northeast1'
+        return os.environ['GAE_SERVICE']
+    except KeyError:  # pragma: no cover
+        from google.appengine.api import modules
+
+        return modules.get_current_module_name()
 
 
-def _gae_version():
+def _get_gae_version():
     try:
         return os.environ['GAE_VERSION']
     except KeyError:  # pragma: no cover
         from google.appengine.api import modules
 
         return modules.get_current_version_name()
+
+
+def _get_location_id():
+    return os.environ['QUEUE_LOCATION']
