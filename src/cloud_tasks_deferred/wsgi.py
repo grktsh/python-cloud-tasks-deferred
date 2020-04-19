@@ -36,7 +36,7 @@ def application(environ, start_response):
         for k, v in six.iteritems(environ)
         if k.upper().startswith('HTTP_X_APPENGINE_')
     ]
-    logger.info(', '.join(headers))
+    logger.log(deferred._DEFAULT_LOG_LEVEL, ', '.join(headers))
 
     content_length = int(environ.get('CONTENT_LENGTH', 0))
     data = environ['wsgi.input'].read(content_length)

@@ -75,6 +75,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import datetime
+import logging
 import os
 import pickle
 import types
@@ -82,6 +83,7 @@ import types
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
 
+_DEFAULT_LOG_LEVEL = logging.INFO
 _DEFAULT_URL = '/_tasks/deferred'
 _DEFAULT_QUEUE = 'default'
 
@@ -100,6 +102,17 @@ class SingularTaskFailure(Error):
 
 class InvalidTaskError(Error):
     """The parameters, headers, or method of the task is invalid."""
+
+
+def set_log_level(log_level):  # pragma: no cover
+    """Sets the log level deferred will log to in normal circumstances.
+
+    Args:
+        log_level: one of logging log levels, e.g. logging.DEBUG,
+        logging.INFO, etc.
+    """
+    global _DEFAULT_LOG_LEVEL
+    _DEFAULT_LOG_LEVEL = log_level
 
 
 def run(data):
