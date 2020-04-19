@@ -50,7 +50,7 @@ In order for tasks to be processed, you need to set up the handler. Add the
 following to your app.yaml handlers section:
 
 handlers:
-- url: /api/tasks/deferred
+- url: /_tasks/deferred
   script: cloud_tasks_deferred.wsgi.application
   login: admin
 
@@ -82,7 +82,7 @@ import types
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
 
-_DEFAULT_URL = '/api/tasks/deferred'
+_DEFAULT_URL = '/_tasks/deferred'
 _DEFAULT_QUEUE = 'default'
 
 
@@ -186,7 +186,7 @@ def _serialize(obj, *args, **kwargs):
 def defer(obj, *args, **kwargs):
     """Defer a callable for execution later.
 
-    The default deferred URL of /api/tasks/deferred will be used unless an
+    The default deferred URL of /_tasks/deferred will be used unless an
     alternate URL is explicitly specified. If you want to use the default URL
     for a queue, specify _url=None. If you specify a different URL, you will
     need to install the handler on that URL (see the module docstring for
