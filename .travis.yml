@@ -1,0 +1,25 @@
+language: python
+dist: xenial
+python:
+  - '2.7'
+  - '3.7'
+  - '3.8'
+install:
+  - pip install tox-travis
+script:
+  - tox -- --cov-report=xml
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+stages:
+  - test
+  - name: deploy
+    if: tag IS present
+jobs:
+  include:
+    - stage: test
+      python: '3.7'
+      install:
+        - pip install pipenv
+        - pipenv install --dev
+      script:
+        - pipenv run pre-commit run --all-files
