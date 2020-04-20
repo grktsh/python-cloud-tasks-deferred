@@ -80,6 +80,7 @@ import os
 import pickle
 import types
 
+import six
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
 
@@ -228,7 +229,8 @@ def defer(obj, *args, **kwargs):
         'url': _DEFAULT_URL,
     }
     task_kwargs = {
-        k: kwargs.pop('_' + k, v) for k, v in task_kwargs_defaults.items()
+        k: kwargs.pop('_' + k, v)
+        for k, v in six.iteritems(task_kwargs_defaults)
     }
     queue = kwargs.pop('_queue', _DEFAULT_QUEUE)
 
