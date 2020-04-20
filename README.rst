@@ -1,16 +1,12 @@
 cloud-tasks-deferred
 ====================
 
-.. image:: https://img.shields.io/pypi/v/cloud-tasks-deferred.svg
-   :alt: PyPI
-   :target: https://pypi.org/project/cloud-tasks-deferred
+.. image:: https://github.com/grktsh/python-cloud-tasks-deferred/workflows/CI/badge.svg
+   :alt: CI
+   :target: https://github.com/grktsh/python-cloud-tasks-deferred/actions
 
-.. image:: https://img.shields.io/travis/grktsh/python-cloud-tasks-deferred/master.svg
-   :alt: Travis
-   :target: https://travis-ci.org/grktsh/python-cloud-tasks-deferred
-
-.. image:: https://img.shields.io/codecov/c/github/grktsh/python-cloud-tasks-deferred/master.svg
-   :alt: Codecov
+.. image:: https://codecov.io/gh/grktsh/python-cloud-tasks-deferred/branch/master/graph/badge.svg
+   :alt: Coverage
    :target: https://codecov.io/gh/grktsh/python-cloud-tasks-deferred
 
 A deferred library for Google Cloud Tasks.
